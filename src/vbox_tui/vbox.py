@@ -166,6 +166,20 @@ class VBoxManager:
         """Reset a VM (hard reboot)."""
         self._run_command(["controlvm", vm.uuid, "reset"])
     
+    def show_vm(self, vm: VM) -> None:
+        """Show/reconnect to a VM's GUI window."""
+        # For running VMs, this will open/reconnect to the GUI
+        # VBoxManage showvminfo can be used with --details to show the window
+        # But the proper way is to use VBoxManage controlvm <vm> show
+        # However, if the VM is already running, we can use startvm with type gui
+        # which will show the existing VM window
+        if vm.is_running or vm.state == "paused":
+            # For already running VMs, VBoxHeadless or gui frontend will reconnect
+            self._run_command(["startvm", vm.uuid, "--type", "separate"])
+        else:
+            # Start the VM with GUI
+            self._run_command(["startvm", vm.uuid, "--type", "gui"])
+    
     def get_vm_info(self, vm: VM) -> Dict[str, str]:
         """Get detailed VM information."""
         output = self._run_command(["showvminfo", vm.uuid, "--machinereadable"])
@@ -180,7 +194,33 @@ class VBoxManager:
         """Modify a VM setting."""
         self._run_command(["modifyvm", vm.uuid, f"--{setting}", value])
     
-    def create_vm(self, name: str, ostype: str, memory: int, cpus: int, vram: int, disk_size: int) -> None:
+    def attach_iso(self, vm: VM, iso_path: str = None) -> None:
+        """Attach or detach an ISO to/from the DVD drive.
+        
+        Args:
+            vm: The VM to modify
+            iso_path: Path to ISO file, or None/empty to eject
+        """
+        import os
+        
+        # Determine the medium parameter
+        if iso_path and os.path.exists(iso_path):
+            medium = iso_path
+        else:
+            medium = "emptydrive"
+        
+        # Attach to port 1 (DVD drive) on SATA Controller
+        self._run_command([
+            "storageattach", vm.uuid,
+            "--storagectl", "SATA Controller",
+            "--port", "1",
+            "--device", "0",
+            "--type", "dvddrive",
+            "--medium", medium
+        ])
+    
+    def create_vm(self, name: str, ostype: str, memory: int, cpus: int, vram: int, disk_size: int, 
+                  iso_path: str = None, network_type: str = "nat") -> None:
         """Create a new VM with basic configuration."""
         # Create the VM
         output = self._run_command(["createvm", "--name", name, "--ostype", ostype, "--register"])
@@ -203,8 +243,9 @@ class VBoxManager:
             self._run_command(["modifyvm", uuid, "--boot3", "none"])
             self._run_command(["modifyvm", uuid, "--boot4", "none"])
             
-            # Add network adapter (NAT by default)
-            self._run_command(["modifyvm", uuid, "--nic1", "nat"])
+            # Add network adapter
+            if network_type and network_type.lower() != "none":
+                self._run_command(["modifyvm", uuid, "--nic1", network_type.lower()])
             
             # Create storage controller
             self._run_command([
@@ -234,15 +275,38 @@ class VBoxManager:
                 "--medium", disk_path
             ])
             
-            # Add empty DVD drive
-            self._run_command([
-                "storageattach", uuid,
-                "--storagectl", "SATA Controller",
-                "--port", "1",
-                "--device", "0",
-                "--type", "dvddrive",
-                "--medium", "emptydrive"
-            ])
+            # Attach ISO if provided
+            if iso_path:
+                import os
+                if os.path.exists(iso_path):
+                    self._run_command([
+                        "storageattach", uuid,
+                        "--storagectl", "SATA Controller",
+                        "--port", "1",
+                        "--device", "0",
+                        "--type", "dvddrive",
+                        "--medium", iso_path
+                    ])
+                else:
+                    # Still create the VM with empty DVD drive
+                    self._run_command([
+                        "storageattach", uuid,
+                        "--storagectl", "SATA Controller",
+                        "--port", "1",
+                        "--device", "0",
+                        "--type", "dvddrive",
+                        "--medium", "emptydrive"
+                    ])
+            else:
+                # Add empty DVD drive
+                self._run_command([
+                    "storageattach", uuid,
+                    "--storagectl", "SATA Controller",
+                    "--port", "1",
+                    "--device", "0",
+                    "--type", "dvddrive",
+                    "--medium", "emptydrive"
+                ])
             
         except Exception as e:
             # If configuration fails, try to unregister and delete the VM

@@ -8,6 +8,7 @@ from textual import work
 import asyncio
 
 from .vbox import VBoxManager
+from .file_browser import FileBrowser
 
 
 class CreateVMScreen(Screen):
@@ -44,6 +45,21 @@ class CreateVMScreen(Screen):
         width: 1fr;
     }
     
+    #iso-row {
+        height: auto;
+        margin: 1 0;
+    }
+    
+    #iso-row Input {
+        width: 1fr;
+    }
+    
+    #iso-row Button {
+        width: 12;
+        min-width: 12;
+        margin-left: 1;
+    }
+    
     #button-row {
         margin-top: 2;
         align: center middle;
@@ -75,6 +91,15 @@ class CreateVMScreen(Screen):
         ("Arch Linux (64-bit)", "ArchLinux_64"),
         ("Other Linux (64-bit)", "Linux_64"),
         ("Other Linux (32-bit)", "Linux"),
+    ]
+    
+    # Network adapter types
+    NETWORK_TYPES = [
+        ("NAT", "nat"),
+        ("Bridged Adapter", "bridged"),
+        ("Internal Network", "intnet"),
+        ("Host-only Adapter", "hostonly"),
+        ("Not attached", "none"),
     ]
     
     def __init__(self, vbox: VBoxManager):
@@ -115,7 +140,21 @@ class CreateVMScreen(Screen):
                 yield Label("Disk Size (MB):", classes="create-label")
                 yield Input(placeholder="20480", id="input-disk", value="20480")
             
-            yield Static("\n[dim]Note: This creates a VM with a dynamically allocated disk[/dim]")
+            with Horizontal(id="iso-row"):
+                yield Label("ISO Image:", classes="create-label")
+                yield Input(placeholder="/path/to/image.iso (optional)", id="input-iso")
+                yield Button("Browse...", id="btn-browse")
+            
+            with Horizontal(classes="create-row"):
+                yield Label("Network:", classes="create-label")
+                yield Select(
+                    options=[(label, value) for label, value in self.NETWORK_TYPES],
+                    id="select-network",
+                    allow_blank=False,
+                    value="nat"
+                )
+            
+            yield Static("\n[dim]Note: ISO will be attached to DVD drive if provided[/dim]")
             
             with Horizontal(id="button-row"):
                 yield Button("Create", variant="success", id="btn-create")
@@ -127,6 +166,8 @@ class CreateVMScreen(Screen):
             self.action_create()
         elif event.button.id == "btn-cancel":
             self.action_cancel()
+        elif event.button.id == "btn-browse":
+            self.action_browse()
     
     @work(exclusive=True)
     async def action_create(self) -> None:
@@ -143,6 +184,8 @@ class CreateVMScreen(Screen):
             cpus = self.query_one("#input-cpus", Input).value.strip()
             vram = self.query_one("#input-vram", Input).value.strip()
             disk_size = self.query_one("#input-disk", Input).value.strip()
+            iso_path = self.query_one("#input-iso", Input).value.strip()
+            network_type = self.query_one("#select-network", Select).value
             
             # Validate inputs
             try:
@@ -164,7 +207,9 @@ class CreateVMScreen(Screen):
                 memory=memory_int,
                 cpus=cpus_int,
                 vram=vram_int,
-                disk_size=disk_size_int
+                disk_size=disk_size_int,
+                iso_path=iso_path if iso_path else None,
+                network_type=network_type
             )
             
             self.notify(f"VM '{name}' created successfully!", severity="information")
@@ -172,6 +217,19 @@ class CreateVMScreen(Screen):
             
         except Exception as e:
             self.notify(f"Error creating VM: {e}", severity="error", timeout=5)
+    
+    @work
+    async def action_browse(self) -> None:
+        """Open file browser to select an ISO file."""
+        # Get current ISO path if any
+        current_path = self.query_one("#input-iso", Input).value.strip()
+        
+        # Open file browser
+        result = await self.app.push_screen_wait(FileBrowser(current_path or None))
+        
+        # Update input field if a file was selected
+        if result:
+            self.query_one("#input-iso", Input).value = result
     
     def action_cancel(self) -> None:
         """Cancel and close the screen."""

@@ -81,12 +81,13 @@ class VBoxTUI(App):
     
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
-        Binding("r", "refresh", "Refresh"),
         Binding("n", "new_vm", "New VM"),
         Binding("s", "start_vm", "Start"),
         Binding("t", "stop_vm", "Stop"),
+        Binding("f", "force_poweroff", "Force Poweroff"),
         Binding("p", "pause_vm", "Pause/Resume"),
         Binding("v", "save_state", "Save State"),
+        Binding("g", "show_gui", "Show GUI"),
         Binding("h", "toggle_headless", "Toggle Headless"),
         Binding("c", "config", "Config"),
         Binding("d", "delete_vm", "Delete"),
@@ -117,6 +118,8 @@ class VBoxTUI(App):
     async def on_mount(self) -> None:
         """Load VMs when app starts."""
         self.refresh_vms()
+        # Set up automatic refresh every 3 seconds
+        self.set_interval(3, self.refresh_vms)
     
     @work(exclusive=True)
     async def refresh_vms(self) -> None:
@@ -195,11 +198,6 @@ class VBoxTUI(App):
             info_panel.update_vm(self.selected_vm)
             self.notify(f"Error loading VM details: {e}", severity="warning")
     
-    def action_refresh(self) -> None:
-        """Refresh VM list."""
-        self.notify("Refreshing VM list...")
-        self.refresh_vms()
-    
     def action_toggle_headless(self) -> None:
         """Toggle headless/GUI mode."""
         self.headless_mode = not self.headless_mode
@@ -251,6 +249,45 @@ class VBoxTUI(App):
         except Exception as e:
             self.notify(f"Error stopping VM: {e}", severity="error", timeout=5)
     
+    def action_force_poweroff(self) -> None:
+        """Force poweroff the selected VM."""
+        self._force_poweroff_worker()
+    
+    @work(exclusive=True)
+    async def _force_poweroff_worker(self) -> None:
+        """Worker for force poweroff with confirmation."""
+        if not self.selected_vm:
+            self.notify("No VM selected", severity="warning")
+            return
+        
+        if not self.selected_vm.is_running and self.selected_vm.state != "paused":
+            self.notify(f"{self.selected_vm.name} is not running", severity="warning")
+            return
+        
+        # Confirm force poweroff
+        from .force_poweroff_screen import ForcePoweroffScreen
+        confirm_screen = ForcePoweroffScreen(self.selected_vm)
+        result = await self.app.push_screen_wait(confirm_screen)
+        
+        if result:  # If user confirmed
+            await self._do_force_poweroff()
+    
+    async def _do_force_poweroff(self) -> None:
+        """Actually force poweroff the VM."""
+        if not self.selected_vm:
+            return
+        
+        vm_name = self.selected_vm.name
+        
+        try:
+            self.notify(f"Force powering off {vm_name}...", severity="warning")
+            await asyncio.to_thread(self.vbox.stop_vm, self.selected_vm, force=True)
+            self.notify(f"{vm_name} powered off", severity="information")
+            await asyncio.sleep(1)
+            self.refresh_vms()
+        except Exception as e:
+            self.notify(f"Error powering off VM: {e}", severity="error", timeout=5)
+    
     @work(exclusive=True)
     async def action_pause_vm(self) -> None:
         """Pause or resume the selected VM."""
@@ -294,6 +331,20 @@ class VBoxTUI(App):
             self.refresh_vms()
         except Exception as e:
             self.notify(f"Error saving state: {e}", severity="error", timeout=5)
+    
+    @work(exclusive=True)
+    async def action_show_gui(self) -> None:
+        """Show/reconnect to VM GUI window."""
+        if not self.selected_vm:
+            self.notify("No VM selected", severity="warning")
+            return
+        
+        try:
+            self.notify(f"Opening GUI for {self.selected_vm.name}...")
+            await asyncio.to_thread(self.vbox.show_vm, self.selected_vm)
+            self.notify(f"GUI window opened for {self.selected_vm.name}", severity="information")
+        except Exception as e:
+            self.notify(f"Error showing GUI: {e}", severity="error", timeout=5)
     
     async def action_config(self) -> None:
         """Open config screen."""

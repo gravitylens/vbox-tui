@@ -88,14 +88,19 @@ python -m vbox_tui.app
 | Key | Action |
 |-----|--------|
 | `↑`/`↓` | Navigate VM list |
+| `n` | Create new VM |
 | `s` | Start selected VM |
 | `t` | Stop selected VM (ACPI shutdown) |
+| `f` | Force poweroff selected VM |
 | `p` | Pause/Resume selected VM |
 | `v` | Save VM state |
-| `h` | Toggle headless/GUI mode |
+| `g` | Show/reconnect to VM GUI window |
+| `h` | Toggle headless/GUI mode for starting VMs |
 | `c` | Configure selected VM |
-| `r` | Refresh VM list |
+| `d` | Delete selected VM |
 | `q` | Quit application |
+
+The VM list automatically refreshes every 3 seconds to show current status.
 
 ## VM States
 
@@ -112,11 +117,20 @@ The TUI displays VMs with status icons:
 To modify VM settings:
 
 1. Select a VM from the list
-2. Press `c` or click the "Config" button
-3. Edit the desired settings (memory, CPUs, VRAM, boot device)
+2. Press `c` to open the configuration screen
+3. Edit the desired settings (memory, CPUs, VRAM, boot device, ISO attachment, network)
 4. Click "Save" or press Enter
 
 **Note:** VMs must be powered off to change most settings.
+
+## Reconnecting to VM GUI
+
+If you've lost connection to a running VM's GUI window (e.g., the window was closed but the VM is still running), you can reconnect by:
+
+1. Select the VM from the list
+2. Press `g` to show/reconnect to the GUI window
+
+This works for VMs in running or paused states and will open a new window showing the VM's display.
 
 ## Architecture
 
