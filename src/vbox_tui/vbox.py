@@ -53,16 +53,19 @@ class VBoxManager:
         except (subprocess.CalledProcessError, FileNotFoundError):
             raise RuntimeError("VBoxManage not found. Is VirtualBox installed?")
     
-    def _run_command(self, args: List[str]) -> str:
+    def _run_command(self, args: List[str], timeout: int = 30) -> str:
         """Run a VBoxManage command and return output."""
         try:
             result = subprocess.run(
                 ["VBoxManage"] + args,
                 capture_output=True,
                 check=True,
-                text=True
+                text=True,
+                timeout=timeout
             )
             return result.stdout.strip()
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"VBoxManage command timed out after {timeout} seconds")
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"VBoxManage error: {e.stderr}")
     
@@ -193,6 +196,18 @@ class VBoxManager:
     def modify_vm(self, vm: VM, setting: str, value: str) -> None:
         """Modify a VM setting."""
         self._run_command(["modifyvm", vm.uuid, f"--{setting}", value])
+    
+    def get_default_machine_folder(self) -> str:
+        """Get the default machine folder setting."""
+        output = self._run_command(["list", "systemproperties"])
+        for line in output.splitlines():
+            if "Default machine folder:" in line:
+                return line.split(":", 1)[1].strip()
+        return ""
+    
+    def set_default_machine_folder(self, path: str) -> None:
+        """Set the default machine folder."""
+        self._run_command(["setproperty", "machinefolder", path])
     
     def attach_iso(self, vm: VM, iso_path: str = None) -> None:
         """Attach or detach an ISO to/from the DVD drive.

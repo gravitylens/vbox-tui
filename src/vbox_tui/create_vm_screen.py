@@ -22,7 +22,7 @@ class CreateVMScreen(Screen):
     #create-container {
         width: 90%;
         max-width: 100;
-        height: 90%;
+        max-height: 90%;
         border: solid $accent;
         padding: 1 2;
         background: $surface;
@@ -69,7 +69,12 @@ class CreateVMScreen(Screen):
     
     #button-row {
         margin-top: 2;
+        height: auto;
         align: center middle;
+    }
+    
+    #button-row Button {
+        min-height: 3;
     }
     
     Button {
@@ -248,6 +253,9 @@ class CreateVMScreen(Screen):
             with Horizontal(id="button-row"):
                 yield Button("Create", variant="success", id="btn-create")
                 yield Button("Cancel", variant="default", id="btn-cancel")
+            
+            # Spacer to ensure buttons are visible when scrolled
+            yield Static("\n\n\n")
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses."""

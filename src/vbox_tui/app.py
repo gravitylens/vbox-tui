@@ -13,6 +13,7 @@ import logging
 from .vbox import VBoxManager, VM
 from .config_screen import ConfigScreen
 from .create_vm_screen import CreateVMScreen
+from .settings_screen import SettingsScreen
 
 # Set up logging
 logging.basicConfig(
@@ -125,6 +126,7 @@ class VBoxTUI(App):
         # Core navigation and app control
         "quit": ("q", "Quit"),
         "new_vm": ("n", "New VM"),
+        "settings": ("e", "Settings"),
         
         # VM lifecycle operations
         "start_vm": ("s", "Start"),
@@ -182,16 +184,22 @@ class VBoxTUI(App):
             self.vms = await asyncio.to_thread(self.vbox.list_vms)
             self.update_table()
         except Exception as e:
-            self.notify(f"Error loading VMs: {e}", severity="error", timeout=5)
+            self.notify(f"Error loading VMs: {e}", severity="error", timeout=10)
+            logger.error(f"Failed to refresh VMs: {e}", exc_info=True)
     
     def update_table(self) -> None:
         """Update the data table with current VMs."""
         table = self.query_one("#vm-table", DataTable)
+        
+        # Remember the currently selected VM UUID
+        selected_uuid = self.selected_vm.uuid if self.selected_vm else None
+        
         table.clear()
         
-        for vm in self.vms:
+        row_to_select = None
+        for idx, vm in enumerate(self.vms):
             status_style = self._get_status_style(vm.state)
-            table.add_row(
+            row_key = table.add_row(
                 vm.status_icon,
                 vm.name,
                 Text(vm.state.upper(), style=status_style),
@@ -200,6 +208,14 @@ class VBoxTUI(App):
                 vm.os_type,
                 key=vm.uuid
             )
+            
+            # Track which row corresponds to the previously selected VM
+            if selected_uuid and vm.uuid == selected_uuid:
+                row_to_select = idx
+        
+        # Restore cursor position if we found the previously selected VM
+        if row_to_select is not None:
+            table.move_cursor(row=row_to_select)
         
         # Update status
         self.sub_title = f"{len(self.vms)} VMs"
@@ -402,6 +418,15 @@ class VBoxTUI(App):
         
         if result:  # If changes were saved
             self.refresh_vms()
+    
+    async def action_settings(self) -> None:
+        """Open settings screen."""
+        settings_screen = SettingsScreen(self.vbox)
+        result = await self.push_screen(settings_screen)
+        
+        if result:  # If settings were saved
+            self.notify("Settings updated", severity="information")
+    
     async def action_new_vm(self) -> None:
         """Open create VM screen."""
         create_screen = CreateVMScreen(self.vbox)
@@ -474,7 +499,10 @@ class VBoxTUI(App):
 def main():
     """Run the application."""
     app = VBoxTUI()
-    app.run()
+    try:
+        app.run()
+    except KeyboardInterrupt:
+        pass  # Clean exit on Ctrl+C
 
 
 if __name__ == "__main__":

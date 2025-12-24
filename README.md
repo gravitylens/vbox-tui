@@ -89,6 +89,7 @@ python -m vbox_tui.app
 |-----|--------|
 | `↑`/`↓` | Navigate VM list |
 | `n` | Create new VM |
+| `e` | Settings (configure default VM folder) |
 | `s` | Start selected VM (headless) |
 | `t` | Stop selected VM (ACPI shutdown) |
 | `f` | Force poweroff selected VM |
@@ -102,6 +103,12 @@ python -m vbox_tui.app
 The VM list automatically refreshes every 10 seconds to show current status.
 
 VMs are always started in headless mode. Use `g` to open the GUI console window.
+
+## Settings
+
+Press `e` to access the settings screen where you can configure:
+
+- **Default VM Folder**: Where new VMs will be created (changes VirtualBox's global setting)
 
 ## VM States
 

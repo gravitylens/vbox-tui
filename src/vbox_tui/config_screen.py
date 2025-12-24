@@ -47,7 +47,7 @@ class ConfigScreen(Screen):
     #config-container {
         width: 90%;
         max-width: 100;
-        height: 90%;
+        max-height: 90%;
         border: solid $accent;
         padding: 1 2;
         background: $surface;
@@ -94,7 +94,12 @@ class ConfigScreen(Screen):
     
     #button-row {
         margin-top: 2;
+        height: auto;
         align: center middle;
+    }
+    
+    #button-row Button {
+        min-height: 3;
     }
     
     Button {
@@ -212,6 +217,9 @@ class ConfigScreen(Screen):
             with Horizontal(id="button-row"):
                 yield Button("Save", variant="success", id="btn-save")
                 yield Button("Cancel", variant="default", id="btn-cancel")
+            
+            # Spacer to ensure buttons are visible when scrolled
+            yield Static("\n\n\n")
     
     def on_mount(self) -> None:
         """Load current VM settings."""

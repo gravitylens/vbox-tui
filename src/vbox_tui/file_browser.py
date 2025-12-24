@@ -22,7 +22,7 @@ class FileBrowser(Screen):
     
     #browser-container {
         width: 80%;
-        height: 80%;
+        max-height: 80%;
         border: solid $accent;
         padding: 1 2;
         background: $surface;
@@ -39,12 +39,21 @@ class FileBrowser(Screen):
     }
     
     #browser-footer {
-        height: 3;
+        height: auto;
         margin-top: 1;
     }
     
     #button-row {
+        height: auto;
         align: center middle;
+    }
+    
+    #button-row Button {
+        min-height: 3;
+    }
+    
+    Button {
+        margin: 0 1;
     }
     """
     
@@ -72,6 +81,9 @@ class FileBrowser(Screen):
                 with Horizontal(id="button-row"):
                     yield Button("Select", variant="success", id="btn-select")
                     yield Button("Cancel", variant="default", id="btn-cancel")
+                
+                # Spacer to ensure buttons are visible
+                yield Static("\n\n")
     
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         """Handle file selection in the tree."""
