@@ -37,6 +37,38 @@ cd vbox-tui
 pip install -r requirements.txt
 ```
 
+### Option 3: Use pre-built binary
+
+Download the latest binary from the [Releases](https://github.com/gravitylens/vbox-tui/releases) page and make it executable:
+
+```bash
+chmod +x vbox-tui
+sudo mv vbox-tui /usr/local/bin/
+```
+
+## Building from Source
+
+### Standard Installation
+
+```bash
+git clone https://github.com/gravitylens/vbox-tui.git
+cd vbox-tui
+pip install -r requirements.txt
+python -m src.vbox_tui.app
+```
+
+### Building Binary Distribution
+
+To create a standalone binary:
+
+```bash
+pip install pyinstaller
+./build-binary.sh
+```
+
+The binary will be created in `dist/vbox-tui` and can be distributed without Python dependencies.
+
+
 ## Usage
 
 ### If installed with pip:
