@@ -7,13 +7,13 @@ A modern Terminal User Interface (TUI) for managing VirtualBox virtual machines,
 
 ## Features
 
-- 📊 **VM Overview**: See all your VMs at a glance with status indicators
-- ▶️ **Start/Stop VMs**: Quick controls to start, stop, pause, and resume VMs
-- 💾 **Save State**: Save VM state for quick resume later
-- ⚙️ **Configuration**: Edit VM settings (memory, CPUs, VRAM, etc.)
-- 🎨 **Modern UI**: Clean, colorful interface built with Textual
-- ⌨️ **Keyboard Shortcuts**: Fast navigation and control
-- 🔄 **Real-time Updates**: Automatic refresh of VM status
+- **VM Overview**: See all your VMs at a glance with status indicators
+- **Start/Stop VMs**: Quick controls to start, stop, pause, and resume VMs
+- **Save State**: Save VM state for quick resume later
+- **Configuration**: Edit VM settings (memory, CPUs, VRAM, etc.)
+- **Modern UI**: Clean, colorful interface built with Textual
+- **Keyboard Shortcuts**: Fast navigation and control
+- **Real-time Updates**: Automatic refresh of VM status
 
 ## Requirements
 
@@ -69,11 +69,11 @@ python -m vbox_tui.app
 
 The TUI displays VMs with status icons:
 
-- ▶ Running
-- ⏸ Paused
-- 💾 Saved
-- ⏹ Powered Off
-- ○ Other states
+- Running
+- Paused
+- Saved
+- Powered Off
+- Other states
 
 ## Configuration Changes
 
@@ -153,15 +153,13 @@ MIT License - feel free to use and modify as needed.
 
 ## Future Enhancements
 
-- [ ] Create new VMs
-- [ ] Clone VMs
-- [ ] Delete VMs
-- [ ] Snapshot management
-- [ ] VM import/export
-- [ ] Network configuration
-- [ ] Storage management
-- [ ] Log viewer
-- [ ] Performance metrics
+- Clone VMs
+- Snapshot management
+- VM import/export
+- Network configuration
+- Storage management
+- Log viewer
+- Performance metrics
 
 ## Contributing
 
