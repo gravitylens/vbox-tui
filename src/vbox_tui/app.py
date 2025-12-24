@@ -40,16 +40,56 @@ class VMInfoPanel(Static):
         info_text = f"""[bold cyan]{vm.name}[/bold cyan]
 [dim]UUID:[/dim] {vm.uuid}
 [dim]State:[/dim] {vm.status_icon} {vm.state.upper()}
-[dim]Memory:[/dim] {vm.memory} MB
-[dim]CPUs:[/dim] {vm.cpus}
-[dim]OS Type:[/dim] {vm.os_type}
 """
         
         if detailed_info:
-            info_text += "\n[bold]Additional Info:[/bold]\n"
-            for key in ["boot1", "vram", "nic1"]:
+            # Group related information
+            info_text += "\n[bold yellow]Hardware:[/bold yellow]\n"
+            hardware_keys = ["memory", "cpus", "vram", "firmware", "chipset", "cpuexecutioncap"]
+            for key in hardware_keys:
                 if key in detailed_info:
+                    label = key.replace("_", " ").title()
+                    value = detailed_info[key]
+                    if key == "memory":
+                        value = f"{value} MB"
+                    elif key == "cpuexecutioncap":
+                        value = f"{value}%"
+                    info_text += f"[dim]{label}:[/dim] {value}\n"
+            
+            info_text += "\n[bold yellow]Storage:[/bold yellow]\n"
+            storage_keys = [k for k in detailed_info.keys() if k.startswith("SATA") or k.startswith("IDE") or "storage" in k.lower()]
+            if storage_keys:
+                for key in storage_keys[:5]:  # Limit to first 5 storage items
                     info_text += f"[dim]{key}:[/dim] {detailed_info[key]}\n"
+            else:
+                info_text += "[dim]No storage info[/dim]\n"
+            
+            info_text += "\n[bold yellow]Network:[/bold yellow]\n"
+            network_keys = [k for k in detailed_info.keys() if k.startswith("nic") or "network" in k.lower() or k.startswith("macaddress")]
+            if network_keys:
+                for key in sorted(network_keys)[:8]:  # Limit to 8 network items
+                    info_text += f"[dim]{key}:[/dim] {detailed_info[key]}\n"
+            else:
+                info_text += "[dim]No network info[/dim]\n"
+            
+            info_text += "\n[bold yellow]Boot & Graphics:[/bold yellow]\n"
+            boot_keys = ["boot1", "boot2", "boot3", "boot4", "graphicscontroller", "accelerate3d", "accelerate2dvideo"]
+            for key in boot_keys:
+                if key in detailed_info:
+                    label = key.replace("_", " ").title()
+                    info_text += f"[dim]{label}:[/dim] {detailed_info[key]}\n"
+            
+            info_text += "\n[bold yellow]System:[/bold yellow]\n"
+            system_keys = ["ostype", "description", "guestostype", "clipboard", "draganddrop"]
+            for key in system_keys:
+                if key in detailed_info:
+                    label = key.replace("_", " ").title()
+                    info_text += f"[dim]{label}:[/dim] {detailed_info[key]}\n"
+        else:
+            # Fallback to basic info if detailed_info not available
+            info_text += f"[dim]Memory:[/dim] {vm.memory} MB\n"
+            info_text += f"[dim]CPUs:[/dim] {vm.cpus}\n"
+            info_text += f"[dim]OS Type:[/dim] {vm.os_type}\n"
         
         self.update(info_text)
 
@@ -72,6 +112,7 @@ class VBoxTUI(App):
         height: 100%;
         border: solid $accent;
         padding: 1;
+        overflow-y: auto;
     }
     
     DataTable {
@@ -79,24 +120,36 @@ class VBoxTUI(App):
     }
     """
     
+    # Keybinding configuration - modify this dict to change shortcuts
+    KEYBINDINGS = {
+        # Core navigation and app control
+        "quit": ("q", "Quit"),
+        "new_vm": ("n", "New VM"),
+        
+        # VM lifecycle operations
+        "start_vm": ("s", "Start"),
+        "stop_vm": ("t", "Stop"),
+        "force_poweroff": ("f", "Force Poweroff"),
+        "pause_vm": ("p", "Pause/Resume"),
+        "save_state": ("v", "Save State"),
+        
+        # VM interaction
+        "show_gui": ("g", "Show Console"),
+        
+        # VM management
+        "config": ("c", "Config"),
+        "delete_vm": ("d", "Delete"),
+    }
+    
+    # Generate BINDINGS from KEYBINDINGS dict
     BINDINGS = [
-        Binding("q", "quit", "Quit", priority=True),
-        Binding("n", "new_vm", "New VM"),
-        Binding("s", "start_vm", "Start"),
-        Binding("t", "stop_vm", "Stop"),
-        Binding("f", "force_poweroff", "Force Poweroff"),
-        Binding("p", "pause_vm", "Pause/Resume"),
-        Binding("v", "save_state", "Save State"),
-        Binding("g", "show_gui", "Show GUI"),
-        Binding("h", "toggle_headless", "Toggle Headless"),
-        Binding("c", "config", "Config"),
-        Binding("d", "delete_vm", "Delete"),
+        Binding(key, action, description, priority=(action == "quit"))
+        for action, (key, description) in KEYBINDINGS.items()
     ]
     
     TITLE = "VirtualBox TUI"
     
     selected_vm: reactive[VM | None] = reactive(None)
-    headless_mode: reactive[bool] = reactive(True)
     
     def __init__(self):
         super().__init__()
@@ -118,8 +171,8 @@ class VBoxTUI(App):
     async def on_mount(self) -> None:
         """Load VMs when app starts."""
         self.refresh_vms()
-        # Set up automatic refresh every 3 seconds
-        self.set_interval(3, self.refresh_vms)
+        # Set up automatic refresh every 10 seconds
+        self.set_interval(10, self.refresh_vms)
     
     @work(exclusive=True)
     async def refresh_vms(self) -> None:
@@ -149,8 +202,7 @@ class VBoxTUI(App):
             )
         
         # Update status
-        mode = "headless" if self.headless_mode else "GUI"
-        self.sub_title = f"{len(self.vms)} VMs | Mode: {mode}"
+        self.sub_title = f"{len(self.vms)} VMs"
     
     def _get_status_style(self, state: str) -> str:
         """Get color style for VM state."""
@@ -198,13 +250,6 @@ class VBoxTUI(App):
             info_panel.update_vm(self.selected_vm)
             self.notify(f"Error loading VM details: {e}", severity="warning")
     
-    def action_toggle_headless(self) -> None:
-        """Toggle headless/GUI mode."""
-        self.headless_mode = not self.headless_mode
-        mode = "headless" if self.headless_mode else "GUI"
-        self.notify(f"Start mode: {mode}")
-        self.update_table()
-    
     @work(exclusive=True)
     async def action_start_vm(self) -> None:
         """Start the selected VM."""
@@ -221,7 +266,7 @@ class VBoxTUI(App):
             await asyncio.to_thread(
                 self.vbox.start_vm, 
                 self.selected_vm, 
-                self.headless_mode
+                headless=True
             )
             self.notify(f"{self.selected_vm.name} started", severity="information")
             await asyncio.sleep(1)

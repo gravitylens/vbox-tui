@@ -22,17 +22,36 @@ class ConfigScreen(Screen):
         ("None", "none"),
     ]
     
+    GRAPHICS_CONTROLLERS = [
+        ("VBoxVGA", "VBoxVGA"),
+        ("VMSVGA", "VMSVGA"),
+        ("VBoxSVGA", "VBoxSVGA"),
+        ("None", "None"),
+    ]
+    
+    CHIPSET_TYPES = [
+        ("PIIX3", "piix3"),
+        ("ICH9", "ich9"),
+    ]
+    
+    FIRMWARE_TYPES = [
+        ("BIOS", "bios"),
+        ("EFI", "efi"),
+    ]
+    
     CSS = """
     ConfigScreen {
         align: center middle;
     }
     
     #config-container {
-        width: 80;
-        height: auto;
+        width: 90%;
+        max-width: 100;
+        height: 90%;
         border: solid $accent;
         padding: 1 2;
         background: $surface;
+        overflow-y: auto;
     }
     
     .config-row {
@@ -40,8 +59,13 @@ class ConfigScreen(Screen):
         margin: 1 0;
     }
     
+    .section-header {
+        margin-top: 1;
+        margin-bottom: 1;
+    }
+    
     .config-label {
-        width: 20;
+        width: 25;
         padding: 0 1;
     }
     
@@ -94,6 +118,9 @@ class ConfigScreen(Screen):
             yield Label(f"[bold cyan]Configure: {self.vm.name}[/bold cyan]")
             yield Label(f"[dim]UUID: {self.vm.uuid}[/dim]\n")
             
+            # Hardware settings
+            yield Label("[bold yellow]Hardware[/bold yellow]", classes="section-header")
+            
             with Horizontal(classes="config-row"):
                 yield Label("Memory (MB):", classes="config-label")
                 yield Input(placeholder="2048", id="input-memory")
@@ -103,20 +130,76 @@ class ConfigScreen(Screen):
                 yield Input(placeholder="2", id="input-cpus")
             
             with Horizontal(classes="config-row"):
+                yield Label("CPU Execution Cap (%):", classes="config-label")
+                yield Input(placeholder="100", id="input-cpuexecutioncap")
+            
+            with Horizontal(classes="config-row"):
                 yield Label("VRAM (MB):", classes="config-label")
                 yield Input(placeholder="128", id="input-vram")
             
+            # System settings
+            yield Label("\n[bold yellow]System[/bold yellow]", classes="section-header")
+            
             with Horizontal(classes="config-row"):
-                yield Label("Boot Device:", classes="config-label")
-                yield Input(placeholder="disk", id="input-boot")
+                yield Label("Chipset:", classes="config-label")
+                yield Select(
+                    options=[(label, value) for label, value in self.CHIPSET_TYPES],
+                    id="select-chipset",
+                    allow_blank=False,
+                    value="piix3"
+                )
+            
+            with Horizontal(classes="config-row"):
+                yield Label("Firmware:", classes="config-label")
+                yield Select(
+                    options=[(label, value) for label, value in self.FIRMWARE_TYPES],
+                    id="select-firmware",
+                    allow_blank=False,
+                    value="bios"
+                )
+            
+            with Horizontal(classes="config-row"):
+                yield Label("Boot Device 1:", classes="config-label")
+                yield Input(placeholder="disk", id="input-boot1")
+            
+            with Horizontal(classes="config-row"):
+                yield Label("Boot Device 2:", classes="config-label")
+                yield Input(placeholder="dvd", id="input-boot2")
+            
+            # Graphics settings
+            yield Label("\n[bold yellow]Graphics[/bold yellow]", classes="section-header")
+            
+            with Horizontal(classes="config-row"):
+                yield Label("Graphics Controller:", classes="config-label")
+                yield Select(
+                    options=[(label, value) for label, value in self.GRAPHICS_CONTROLLERS],
+                    id="select-graphics",
+                    allow_blank=False,
+                    value="VMSVGA"
+                )
+            
+            with Horizontal(classes="config-row"):
+                yield Label("3D Acceleration:", classes="config-label")
+                yield Select(
+                    options=[("Enabled", "on"), ("Disabled", "off")],
+                    id="select-3d",
+                    allow_blank=False,
+                    value="off"
+                )
+            
+            # Storage settings
+            yield Label("\n[bold yellow]Storage[/bold yellow]", classes="section-header")
             
             with Horizontal(id="iso-row"):
                 yield Label("ISO Image:", classes="config-label")
                 yield Input(placeholder="/path/to/image.iso (optional)", id="input-iso")
                 yield Button("Browse...", id="btn-browse")
             
+            # Network settings
+            yield Label("\n[bold yellow]Network[/bold yellow]", classes="section-header")
+            
             with Horizontal(classes="config-row"):
-                yield Label("Network:", classes="config-label")
+                yield Label("Adapter 1:", classes="config-label")
                 yield Select(
                     options=[(label, value) for label, value in self.NETWORK_TYPES],
                     id="select-network",
@@ -124,7 +207,7 @@ class ConfigScreen(Screen):
                     value="nat"
                 )
             
-            yield Static("\n[dim]Note: VM must be powered off to change settings[/dim]")
+            yield Static("\n[dim]Note: VM must be powered off to change most settings[/dim]")
             
             with Horizontal(id="button-row"):
                 yield Button("Save", variant="success", id="btn-save")
@@ -145,10 +228,26 @@ class ConfigScreen(Screen):
                 self.query_one("#input-memory", Input).value = self.vm_info["memory"]
             if "cpus" in self.vm_info:
                 self.query_one("#input-cpus", Input).value = self.vm_info["cpus"]
+            if "cpuexecutioncap" in self.vm_info:
+                self.query_one("#input-cpuexecutioncap", Input).value = self.vm_info["cpuexecutioncap"]
             if "vram" in self.vm_info:
                 self.query_one("#input-vram", Input).value = self.vm_info["vram"]
+            
+            # System settings
+            if "chipset" in self.vm_info:
+                self.query_one("#select-chipset", Select).value = self.vm_info["chipset"]
+            if "firmware" in self.vm_info:
+                self.query_one("#select-firmware", Select).value = self.vm_info["firmware"]
             if "boot1" in self.vm_info:
-                self.query_one("#input-boot", Input).value = self.vm_info["boot1"]
+                self.query_one("#input-boot1", Input).value = self.vm_info["boot1"]
+            if "boot2" in self.vm_info:
+                self.query_one("#input-boot2", Input).value = self.vm_info["boot2"]
+            
+            # Graphics settings
+            if "graphicscontroller" in self.vm_info:
+                self.query_one("#select-graphics", Select).value = self.vm_info["graphicscontroller"]
+            if "accelerate3d" in self.vm_info:
+                self.query_one("#select-3d", Select).value = self.vm_info["accelerate3d"]
             
             # Load DVD drive info
             dvd_key = '"SATA Controller-ImageUUID-1-0"'
@@ -187,13 +286,21 @@ class ConfigScreen(Screen):
             # Get values from inputs
             memory = self.query_one("#input-memory", Input).value.strip()
             cpus = self.query_one("#input-cpus", Input).value.strip()
+            cpuexecutioncap = self.query_one("#input-cpuexecutioncap", Input).value.strip()
             vram = self.query_one("#input-vram", Input).value.strip()
-            boot = self.query_one("#input-boot", Input).value.strip()
+            chipset = self.query_one("#select-chipset", Select).value
+            firmware = self.query_one("#select-firmware", Select).value
+            boot1 = self.query_one("#input-boot1", Input).value.strip()
+            boot2 = self.query_one("#input-boot2", Input).value.strip()
+            graphics = self.query_one("#select-graphics", Select).value
+            accelerate3d = self.query_one("#select-3d", Select).value
             iso_path = self.query_one("#input-iso", Input).value.strip()
             network_type = self.query_one("#select-network", Select).value
             
             # Apply changes
             changes_made = False
+            
+            # Hardware settings
             if memory and memory != self.vm_info.get("memory", ""):
                 await asyncio.to_thread(self.vbox.modify_vm, self.vm, "memory", memory)
                 changes_made = True
@@ -202,12 +309,38 @@ class ConfigScreen(Screen):
                 await asyncio.to_thread(self.vbox.modify_vm, self.vm, "cpus", cpus)
                 changes_made = True
             
+            if cpuexecutioncap and cpuexecutioncap != self.vm_info.get("cpuexecutioncap", ""):
+                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "cpuexecutioncap", cpuexecutioncap)
+                changes_made = True
+            
             if vram and vram != self.vm_info.get("vram", ""):
                 await asyncio.to_thread(self.vbox.modify_vm, self.vm, "vram", vram)
                 changes_made = True
             
-            if boot and boot != self.vm_info.get("boot1", ""):
-                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "boot1", boot)
+            # System settings
+            if chipset and chipset != self.vm_info.get("chipset", ""):
+                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "chipset", chipset)
+                changes_made = True
+            
+            if firmware and firmware != self.vm_info.get("firmware", ""):
+                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "firmware", firmware)
+                changes_made = True
+            
+            if boot1 and boot1 != self.vm_info.get("boot1", ""):
+                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "boot1", boot1)
+                changes_made = True
+            
+            if boot2 and boot2 != self.vm_info.get("boot2", ""):
+                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "boot2", boot2)
+                changes_made = True
+            
+            # Graphics settings
+            if graphics and graphics != self.vm_info.get("graphicscontroller", ""):
+                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "graphicscontroller", graphics)
+                changes_made = True
+            
+            if accelerate3d and accelerate3d != self.vm_info.get("accelerate3d", ""):
+                await asyncio.to_thread(self.vbox.modify_vm, self.vm, "accelerate3d", accelerate3d)
                 changes_made = True
             
             # Handle ISO attachment/detachment

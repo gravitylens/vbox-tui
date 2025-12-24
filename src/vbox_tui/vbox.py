@@ -220,8 +220,10 @@ class VBoxManager:
         ])
     
     def create_vm(self, name: str, ostype: str, memory: int, cpus: int, vram: int, disk_size: int, 
-                  iso_path: str = None, network_type: str = "nat") -> None:
-        """Create a new VM with basic configuration."""
+                  iso_path: str = None, network_type: str = "nat", description: str = None,
+                  cpuexecutioncap: int = 100, chipset: str = "piix3", firmware: str = "bios",
+                  graphics_controller: str = "VMSVGA", accelerate3d: str = "off") -> None:
+        """Create a new VM with comprehensive configuration."""
         # Create the VM
         output = self._run_command(["createvm", "--name", name, "--ostype", ostype, "--register"])
         
@@ -237,7 +239,22 @@ class VBoxManager:
             # Configure basic settings
             self._run_command(["modifyvm", uuid, "--memory", str(memory)])
             self._run_command(["modifyvm", uuid, "--cpus", str(cpus)])
+            self._run_command(["modifyvm", uuid, "--cpuexecutioncap", str(cpuexecutioncap)])
             self._run_command(["modifyvm", uuid, "--vram", str(vram)])
+            
+            # System settings
+            self._run_command(["modifyvm", uuid, "--chipset", chipset])
+            self._run_command(["modifyvm", uuid, "--firmware", firmware])
+            
+            # Graphics settings
+            self._run_command(["modifyvm", uuid, "--graphicscontroller", graphics_controller])
+            self._run_command(["modifyvm", uuid, "--accelerate3d", accelerate3d])
+            
+            # Description
+            if description:
+                self._run_command(["modifyvm", uuid, "--description", description])
+            
+            # Boot order
             self._run_command(["modifyvm", uuid, "--boot1", "disk"])
             self._run_command(["modifyvm", uuid, "--boot2", "dvd"])
             self._run_command(["modifyvm", uuid, "--boot3", "none"])

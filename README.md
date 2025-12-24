@@ -89,18 +89,19 @@ python -m vbox_tui.app
 |-----|--------|
 | `↑`/`↓` | Navigate VM list |
 | `n` | Create new VM |
-| `s` | Start selected VM |
+| `s` | Start selected VM (headless) |
 | `t` | Stop selected VM (ACPI shutdown) |
 | `f` | Force poweroff selected VM |
 | `p` | Pause/Resume selected VM |
 | `v` | Save VM state |
 | `g` | Show/reconnect to VM GUI window |
-| `h` | Toggle headless/GUI mode for starting VMs |
 | `c` | Configure selected VM |
 | `d` | Delete selected VM |
 | `q` | Quit application |
 
-The VM list automatically refreshes every 3 seconds to show current status.
+The VM list automatically refreshes every 10 seconds to show current status.
+
+VMs are always started in headless mode. Use `g` to open the GUI console window.
 
 ## VM States
 
@@ -187,7 +188,7 @@ Then log out and back in.
 
 ### VMs not showing up
 
-Try refreshing the VM list with `r` or check that VirtualBox can see your VMs:
+The VM list automatically refreshes every 10 seconds. If VMs still aren't showing up, check that VirtualBox can see your VMs:
 
 ```bash
 VBoxManage list vms
