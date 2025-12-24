@@ -196,6 +196,39 @@ class VBoxManager:
     def modify_vm(self, vm: VM, setting: str, value: str) -> None:
         """Modify a VM setting."""
         self._run_command(["modifyvm", vm.uuid, f"--{setting}", value])
+        # If setting network to bridged, also set the bridge adapter
+        if setting == "nic1" and value.lower() == "bridged":
+            interfaces = self.get_bridged_interfaces()
+            if interfaces:
+                # Prefer physical interfaces (eno, eth, wlan) over virtual ones
+                physical = [i for i in interfaces if i.startswith(("eno", "eth", "wlan", "enp"))]
+                bridge_if = physical[0] if physical else interfaces[0]
+                self._run_command(["modifyvm", vm.uuid, "--bridgeadapter1", bridge_if])
+    
+    def get_guest_ip(self, vm: VM) -> Optional[str]:
+        """Get the guest IP address from VirtualBox guest properties.
+        
+        Requires VirtualBox Guest Additions to be installed in the guest.
+        Returns None if Guest Additions is not installed or no IP is available.
+        """
+        try:
+            output = self._run_command(["guestproperty", "get", vm.uuid, "/VirtualBox/GuestInfo/Net/0/V4/IP"])
+            for line in output.splitlines():
+                if "Value:" in line:
+                    return line.split(":", 1)[1].strip()
+        except:
+            pass
+        return None
+    
+    def get_bridged_interfaces(self) -> List[str]:
+        """Get list of available bridged network interfaces."""
+        output = self._run_command(["list", "bridgedifs"])
+        interfaces = []
+        for line in output.splitlines():
+            if line.startswith("Name:"):
+                interface = line.split(":", 1)[1].strip()
+                interfaces.append(interface)
+        return interfaces
     
     def get_default_machine_folder(self) -> str:
         """Get the default machine folder setting."""
@@ -278,6 +311,14 @@ class VBoxManager:
             # Add network adapter
             if network_type and network_type.lower() != "none":
                 self._run_command(["modifyvm", uuid, "--nic1", network_type.lower()])
+                # For bridged network, set the bridge adapter to first available interface
+                if network_type.lower() == "bridged":
+                    interfaces = self.get_bridged_interfaces()
+                    if interfaces:
+                        # Prefer physical interfaces (eno, eth, wlan) over virtual ones
+                        physical = [i for i in interfaces if i.startswith(("eno", "eth", "wlan", "enp"))]
+                        bridge_if = physical[0] if physical else interfaces[0]
+                        self._run_command(["modifyvm", uuid, "--bridgeadapter1", bridge_if])
             
             # Create storage controller
             self._run_command([
@@ -288,8 +329,16 @@ class VBoxManager:
                 "--portcount", "2"
             ])
             
-            # Create and attach hard disk
-            disk_path = f"{name}.vdi"
+            # Get the VM's folder to place the disk in the right location
+            vm_info = self.get_vm_info(VM(name=name, uuid=uuid, state="poweroff"))
+            vm_folder = vm_info.get("CfgFile", "").rsplit("/", 1)[0] if "CfgFile" in vm_info else ""
+            
+            # Create and attach hard disk with full path
+            if vm_folder:
+                disk_path = f"{vm_folder}/{name}.vdi"
+            else:
+                disk_path = f"{name}.vdi"
+            
             self._run_command([
                 "createmedium", "disk",
                 "--filename", disk_path,

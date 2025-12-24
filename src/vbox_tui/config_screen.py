@@ -243,9 +243,9 @@ class ConfigScreen(Screen):
             
             # System settings
             if "chipset" in self.vm_info:
-                self.query_one("#select-chipset", Select).value = self.vm_info["chipset"]
+                self.query_one("#select-chipset", Select).value = self.vm_info["chipset"].lower()
             if "firmware" in self.vm_info:
-                self.query_one("#select-firmware", Select).value = self.vm_info["firmware"]
+                self.query_one("#select-firmware", Select).value = self.vm_info["firmware"].lower()
             if "boot1" in self.vm_info:
                 self.query_one("#input-boot1", Input).value = self.vm_info["boot1"]
             if "boot2" in self.vm_info:
@@ -253,9 +253,19 @@ class ConfigScreen(Screen):
             
             # Graphics settings
             if "graphicscontroller" in self.vm_info:
-                self.query_one("#select-graphics", Select).value = self.vm_info["graphicscontroller"]
+                # VBoxManage returns lowercase, but Select options are uppercase
+                gc = self.vm_info["graphicscontroller"]
+                if gc.lower() == "vmsvga":
+                    self.query_one("#select-graphics", Select).value = "VMSVGA"
+                elif gc.lower() == "vboxvga":
+                    self.query_one("#select-graphics", Select).value = "VBoxVGA"
+                elif gc.lower() == "vboxsvga":
+                    self.query_one("#select-graphics", Select).value = "VBoxSVGA"
+                elif gc.lower() == "none":
+                    self.query_one("#select-graphics", Select).value = "None"
             if "accelerate3d" in self.vm_info:
-                self.query_one("#select-3d", Select).value = self.vm_info["accelerate3d"]
+                # VBoxManage returns "on" or "off"
+                self.query_one("#select-3d", Select).value = self.vm_info["accelerate3d"].lower()
             
             # Load DVD drive info
             dvd_key = '"SATA Controller-ImageUUID-1-0"'
@@ -269,8 +279,18 @@ class ConfigScreen(Screen):
             
             # Load network configuration
             if "nic1" in self.vm_info:
-                network_type = self.vm_info["nic1"]
-                self.query_one("#select-network", Select).value = network_type
+                network_type = self.vm_info["nic1"].lower()
+                import logging
+                logging.info(f"Loading network type from VM info: '{network_type}'")
+                try:
+                    select = self.query_one("#select-network", Select)
+                    logging.info(f"Select widget current value before set: '{select.value}'")
+                    select.value = network_type
+                    logging.info(f"Select widget value after set: '{select.value}'")
+                except Exception as ex:
+                    logging.error(f"Failed to set network select value: {ex}")
+                    # If value doesn't match, default to nat
+                    self.query_one("#select-network", Select).value = "nat"
         except Exception as e:
             self.notify(f"Error loading VM info: {e}", severity="error")
     

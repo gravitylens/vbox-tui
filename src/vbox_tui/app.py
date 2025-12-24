@@ -27,9 +27,10 @@ logger = logging.getLogger(__name__)
 class VMInfoPanel(Static):
     """Panel showing detailed information about selected VM."""
     
-    def __init__(self, **kwargs):
+    def __init__(self, vbox: VBoxManager, **kwargs):
         super().__init__(**kwargs)
         self.vm: VM | None = None
+        self.vbox = vbox
     
     def update_vm(self, vm: VM | None, detailed_info: dict = None):
         """Update the panel with VM information."""
@@ -66,6 +67,11 @@ class VMInfoPanel(Static):
                 info_text += "[dim]No storage info[/dim]\n"
             
             info_text += "\n[bold yellow]Network:[/bold yellow]\n"
+            # Try to get guest IP if VM is running
+            if vm.is_running:
+                guest_ip = self.vbox.get_guest_ip(vm)
+                if guest_ip:
+                    info_text += f"[bold green]Guest IP:[/bold green] {guest_ip}\n"
             network_keys = [k for k in detailed_info.keys() if k.startswith("nic") or "network" in k.lower() or k.startswith("macaddress")]
             if network_keys:
                 for key in sorted(network_keys)[:8]:  # Limit to 8 network items
@@ -137,6 +143,7 @@ class VBoxTUI(App):
         
         # VM interaction
         "show_gui": ("g", "Show Console"),
+        "ssh_vm": ("h", "SSH"),
         
         # VM management
         "config": ("c", "Config"),
@@ -163,10 +170,10 @@ class VBoxTUI(App):
         yield Header()
         
         table = DataTable(id="vm-table", cursor_type="row")
-        table.add_columns("", "Name", "State", "Memory", "CPUs", "OS Type")
+        table.add_columns("", "Name", "State", "Memory", "CPUs", "OS Type", "IP Address")
         yield table
         
-        yield VMInfoPanel(id="info-panel")
+        yield VMInfoPanel(self.vbox, id="info-panel")
         
         yield Footer()
     
@@ -199,6 +206,14 @@ class VBoxTUI(App):
         row_to_select = None
         for idx, vm in enumerate(self.vms):
             status_style = self._get_status_style(vm.state)
+            
+            # Get IP address for running VMs
+            ip_address = ""
+            if vm.is_running:
+                guest_ip = self.vbox.get_guest_ip(vm)
+                if guest_ip:
+                    ip_address = guest_ip
+            
             row_key = table.add_row(
                 vm.status_icon,
                 vm.name,
@@ -206,6 +221,7 @@ class VBoxTUI(App):
                 f"{vm.memory} MB",
                 str(vm.cpus),
                 vm.os_type,
+                ip_address,
                 key=vm.uuid
             )
             
@@ -406,6 +422,26 @@ class VBoxTUI(App):
             self.notify(f"GUI window opened for {self.selected_vm.name}", severity="information")
         except Exception as e:
             self.notify(f"Error showing GUI: {e}", severity="error", timeout=5)
+    
+    def action_ssh_vm(self) -> None:
+        """SSH to the VM using its IP address."""
+        if not self.selected_vm:
+            self.notify("No VM selected", severity="warning")
+            return
+        if not self.selected_vm.is_running:
+            self.notify("VM is not running", severity="warning")
+            return
+        
+        # Get the VM's IP address
+        guest_ip = self.vbox.get_guest_ip(self.selected_vm)
+        if not guest_ip:
+            self.notify("No IP address available. Guest Additions may not be installed.", severity="warning")
+            return
+        
+        # Suspend the app and launch SSH
+        import subprocess
+        with self.suspend():
+            subprocess.run(["ssh", guest_ip])
     
     async def action_config(self) -> None:
         """Open config screen."""
