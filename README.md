@@ -96,13 +96,46 @@ python -m vbox_tui.app
 | `p` | Pause/Resume selected VM |
 | `v` | Save VM state |
 | `g` | Show/reconnect to VM GUI window |
+| `h` | SSH to VM (requires Guest Additions and guest IP) |
 | `c` | Configure selected VM |
+| `m` | Manage snapshots |
+| `k` | Manage disks |
 | `d` | Delete selected VM |
 | `q` | Quit application |
 
 The VM list automatically refreshes every 10 seconds to show current status.
 
 VMs are always started in headless mode. Use `g` to open the GUI console window.
+
+## Snapshot Management
+
+Press `m` to manage snapshots for the selected VM. In the snapshot screen you can:
+
+- **Take Snapshot (t)**: Create a new snapshot with name and description
+- **Restore (r)**: Restore the VM to a selected snapshot (VM must be powered off)
+- **Delete (d)**: Delete a snapshot
+- **Current Snapshot**: Indicated with a ● marker
+
+Snapshots allow you to save the current state of a VM and restore to it later. They're useful for:
+- Before making system changes
+- Creating restore points
+- Testing configurations safely
+
+## Disk Management
+
+Press `k` to manage disks for the selected VM. In the disk screen you can:
+
+- **New Disk (n)**: Create a new virtual disk and attach it
+  - Specify name, size (in MB), and format (VDI/VMDK/VHD)
+  - Disk is created in the VM's folder
+  - Automatically attached to the next available SATA port
+- **Attach (a)**: Attach an existing disk file
+  - Browse for disk file (.vdi, .vmdk, .vhd, etc.)
+  - Select controller, port, and device number
+- **Detach (d)**: Detach a disk from the VM
+  - Disk file is not deleted, only detached
+
+**Note**: VM should be powered off before attaching/detaching disks.
 
 ## Settings
 

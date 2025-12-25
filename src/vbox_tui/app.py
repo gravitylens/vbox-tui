@@ -14,6 +14,8 @@ from .vbox import VBoxManager, VM
 from .config_screen import ConfigScreen
 from .create_vm_screen import CreateVMScreen
 from .settings_screen import SettingsScreen
+from .snapshot_screen import SnapshotScreen
+from .disk_screen import DiskScreen
 
 # Set up logging
 logging.basicConfig(
@@ -148,6 +150,8 @@ class VBoxTUI(App):
         # VM management
         "config": ("c", "Config"),
         "delete_vm": ("d", "Delete"),
+        "snapshots": ("m", "Snapshots"),
+        "disks": ("k", "Disks"),
     }
     
     # Generate BINDINGS from KEYBINDINGS dict
@@ -470,6 +474,28 @@ class VBoxTUI(App):
         
         if result:  # If VM was created
             self.refresh_vms()
+    
+    async def action_snapshots(self) -> None:
+        """Open snapshot management screen."""
+        if not self.selected_vm:
+            self.notify("No VM selected", severity="warning")
+            return
+        
+        snapshot_screen = SnapshotScreen(self.selected_vm, self.vbox)
+        await self.push_screen(snapshot_screen)
+        # Refresh after returning in case VM state changed
+        self.refresh_vms()
+    
+    async def action_disks(self) -> None:
+        """Open disk management screen."""
+        if not self.selected_vm:
+            self.notify("No VM selected", severity="warning")
+            return
+        
+        disk_screen = DiskScreen(self.selected_vm, self.vbox)
+        await self.push_screen(disk_screen)
+        # Refresh after returning
+        self.refresh_vms()
     
     def action_delete_vm(self) -> None:
         """Delete the selected VM."""

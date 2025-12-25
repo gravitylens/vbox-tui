@@ -403,4 +403,174 @@ class VBoxManager:
             self._run_command(["unregistervm", vm.uuid, "--delete"])
         else:
             self._run_command(["unregistervm", vm.uuid])
+    
+    def list_snapshots(self, vm: VM) -> List[Dict[str, str]]:
+        """List all snapshots for a VM."""
+        try:
+            output = self._run_command(["snapshot", vm.uuid, "list", "--machinereadable"])
+            snapshots = []
+            
+            # Parse the output to extract snapshot information
+            current_snapshot = {}
+            for line in output.splitlines():
+                if line.startswith("SnapshotName"):
+                    match = re.match(r'SnapshotName(?:-(\d+))?="(.+)"', line)
+                    if match:
+                        idx = match.group(1) or "0"
+                        name = match.group(2)
+                        if idx not in [s.get("idx") for s in snapshots]:
+                            snapshots.append({"idx": idx, "name": name})
+                        else:
+                            for s in snapshots:
+                                if s["idx"] == idx:
+                                    s["name"] = name
+                                    break
+                elif line.startswith("SnapshotUUID"):
+                    match = re.match(r'SnapshotUUID(?:-(\d+))?="(.+)"', line)
+                    if match:
+                        idx = match.group(1) or "0"
+                        uuid = match.group(2)
+                        for s in snapshots:
+                            if s["idx"] == idx:
+                                s["uuid"] = uuid
+                                break
+                elif line.startswith("CurrentSnapshotUUID"):
+                    match = re.match(r'CurrentSnapshotUUID="(.+)"', line)
+                    if match:
+                        current_uuid = match.group(1)
+                        for s in snapshots:
+                            if s.get("uuid") == current_uuid:
+                                s["current"] = True
+            
+            return snapshots
+        except (subprocess.CalledProcessError, RuntimeError):
+            # No snapshots exist
+            return []
+    
+    def take_snapshot(self, vm: VM, name: str, description: str = "") -> None:
+        """Take a snapshot of a VM."""
+        cmd = ["snapshot", vm.uuid, "take", name]
+        if description:
+            cmd.extend(["--description", description])
+        self._run_command(cmd)
+    
+    def restore_snapshot(self, vm: VM, snapshot_uuid: str) -> None:
+        """Restore a VM to a snapshot."""
+        self._run_command(["snapshot", vm.uuid, "restore", snapshot_uuid])
+    
+    def delete_snapshot(self, vm: VM, snapshot_uuid: str) -> None:
+        """Delete a snapshot."""
+        self._run_command(["snapshot", vm.uuid, "delete", snapshot_uuid])
+    
+    def list_storage_controllers(self, vm: VM) -> List[Dict[str, str]]:
+        """List storage controllers for a VM."""
+        output = self._run_command(["showvminfo", vm.uuid, "--machinereadable"])
+        controllers = []
+        
+        for line in output.splitlines():
+            if line.startswith("storagecontrollername"):
+                match = re.match(r'storagecontrollername(\d+)="(.+)"', line)
+                if match:
+                    idx = match.group(1)
+                    name = match.group(2)
+                    controllers.append({"idx": idx, "name": name})
+            elif line.startswith("storagecontrollertype"):
+                match = re.match(r'storagecontrollertype(\d+)="(.+)"', line)
+                if match:
+                    idx = match.group(1)
+                    ctrl_type = match.group(2)
+                    for ctrl in controllers:
+                        if ctrl["idx"] == idx:
+                            ctrl["type"] = ctrl_type
+        
+        return controllers
+    
+    def list_disks(self, vm: VM) -> List[Dict[str, str]]:
+        """List all hard disk attachments for a VM (excludes DVD drives)."""
+        output = self._run_command(["showvminfo", vm.uuid, "--machinereadable"])
+        disks = []
+        
+        # First pass: collect all storage attachment info
+        for line in output.splitlines():
+            # Look for lines like: "SATA-0-0"="/path/to/disk.vdi"
+            # or "IDE-1-0"="/path/to/disk.vdi"
+            if line.startswith('"') and '="' in line:
+                match = re.match(r'"([A-Za-z ]+)-(\d+)-(\d+)"="(.+)"', line)
+                if match:
+                    controller = match.group(1)
+                    port = match.group(2)
+                    device = match.group(3)
+                    path = match.group(4)
+                    
+                    # Skip empty, "none", or DVD/ISO files
+                    if not path or path.lower() == "none":
+                        continue
+                    if path.lower().endswith('.iso'):
+                        continue
+                    
+                    # Check if this attachment is a hard disk by looking at the type
+                    type_key = f'"{controller}-{port}-{device}-type"'
+                    is_hdd = False
+                    for type_line in output.splitlines():
+                        if type_line.startswith(type_key):
+                            if '"hdd"' in type_line.lower():
+                                is_hdd = True
+                            break
+                    
+                    # Only add if it's explicitly a hard disk or we can't determine the type
+                    # (assume it's a disk if it has a disk-like extension)
+                    disk_extensions = ['.vdi', '.vmdk', '.vhd', '.qcow', '.qcow2', '.img']
+                    has_disk_ext = any(path.lower().endswith(ext) for ext in disk_extensions)
+                    
+                    if is_hdd or has_disk_ext:
+                        disks.append({
+                            "controller": controller,
+                            "port": port,
+                            "device": device,
+                            "path": path
+                        })
+        
+        # Get size info for each disk
+        for disk in disks:
+            try:
+                medium_output = self._run_command(["showmediuminfo", "disk", disk["path"]])
+                for line in medium_output.splitlines():
+                    if line.startswith("Capacity:"):
+                        disk["size"] = line.split(":", 1)[1].strip()
+                        break
+            except:
+                disk["size"] = "Unknown"
+        
+        return disks
+    
+    def attach_disk(self, vm: VM, controller: str, port: int, device: int, disk_path: str) -> None:
+        """Attach a disk to a VM."""
+        self._run_command([
+            "storageattach", vm.uuid,
+            "--storagectl", controller,
+            "--port", str(port),
+            "--device", str(device),
+            "--type", "hdd",
+            "--medium", disk_path
+        ])
+    
+    def detach_disk(self, vm: VM, controller: str, port: int, device: int) -> None:
+        """Detach a disk from a VM."""
+        self._run_command([
+            "storageattach", vm.uuid,
+            "--storagectl", controller,
+            "--port", str(port),
+            "--device", str(device),
+            "--type", "hdd",
+            "--medium", "none"
+        ])
+    
+    def create_disk(self, path: str, size_mb: int, format: str = "VDI") -> None:
+        """Create a new virtual disk."""
+        self._run_command([
+            "createmedium", "disk",
+            "--filename", path,
+            "--size", str(size_mb),
+            "--format", format
+        ])
 
