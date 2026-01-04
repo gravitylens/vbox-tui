@@ -140,18 +140,30 @@ Press `k` to manage disks for the selected VM. In the disk screen you can:
 
 ## VM Export
 
-Press `x` to export the selected VM to OVA (Open Virtualization Format Archive) format. In the export screen you can:
+Press `x` to export the selected VM to OVA (Open Virtualization Format Archive) format. The export process:
 
-- **Output Location**: Specify where to save the .ova file (use Browse to select)
-- **OVF Version**: Choose the OVF format version:
-  - **OVF 0.9**: Legacy format for older virtualization software
-  - **OVF 1.0**: Widely compatible format
-  - **OVF 2.0**: Recommended modern format with best feature support
-- **Manifest**: Automatically includes a manifest file for integrity verification
+1. **Configure Export**: Specify output location, OVF version, and options
+   - **Output Location**: Path for the .ova file (use Browse button or press Tab to navigate)
+   - **Enter Key**: Press Enter to start the export (same as clicking Export button)
+   - **OVF Version**: Choose the format version:
+     - **OVF 0.9**: Legacy format for older virtualization software
+     - **OVF 1.0**: Widely compatible format
+     - **OVF 2.0**: Recommended modern format with best feature support
+   - **Manifest**: Automatically includes a manifest file for integrity verification
+
+2. **Export Progress**: A progress modal displays during export
+   - Shows export status with animated progress indicator
+   - **Cancel Button**: Stop the export at any time (will clean up partial files)
+   - **Auto-close**: Modal automatically closes 2 seconds after successful completion
+   - Export time varies based on VM disk size
 
 The exported OVA file can be imported into VirtualBox or other virtualization platforms like VMware, supporting VM portability and backup.
 
-**Note**: VMs must be powered off before exporting. Export operations may take several minutes depending on VM disk size.
+**Important Notes:**
+- VMs must be powered off before exporting
+- You can cancel exports at any time using the Cancel button
+- Partial export files are automatically cleaned up if cancelled
+- The application can be quit safely during export (will cancel the export automatically)
 
 ## Settings
 
@@ -197,13 +209,23 @@ The project is structured as follows:
 vbox-tui/
 ├── src/
 │   └── vbox_tui/
-│       ├── __init__.py       # Package initialization
-│       ├── app.py            # Main Textual application
-│       ├── vbox.py           # VBoxManage wrapper
-│       └── config_screen.py  # Configuration screen
-├── pyproject.toml            # Project metadata
-├── requirements.txt          # Python dependencies
-└── README.md                 # This file
+│       ├── __init__.py                  # Package initialization
+│       ├── app.py                       # Main Textual application
+│       ├── vbox.py                      # VBoxManage wrapper
+│       ├── config_screen.py             # VM configuration screen
+│       ├── create_vm_screen.py          # New VM creation dialog
+│       ├── settings_screen.py           # Application settings
+│       ├── snapshot_screen.py           # Snapshot management
+│       ├── disk_screen.py               # Disk management
+│       ├── export_screen.py             # VM export configuration
+│       ├── export_progress_screen.py    # Export progress modal
+│       ├── file_browser.py              # File/folder browser
+│       ├── delete_confirm_screen.py     # VM deletion confirmation
+│       └── force_poweroff_screen.py     # Force poweroff confirmation
+├── pyproject.toml                       # Project metadata
+├── requirements.txt                     # Python dependencies
+├── build-binary.sh                      # Binary build script
+└── README.md                            # This file
 ```
 
 ## Development
@@ -220,7 +242,13 @@ python -m vbox_tui.app
 - **VBoxManager**: Python wrapper around VBoxManage CLI
 - **VBoxTUI**: Main Textual application with VM table and controls
 - **ConfigScreen**: Modal screen for editing VM configuration
-- **VMInfoPanel**: Detailed information panel for selected VM
+- **CreateVMScreen**: Wizard for creating new VMs
+- **SnapshotScreen**: Snapshot management interface
+- **DiskScreen**: Disk attachment and management
+- **ExportScreen**: VM export configuration dialog
+- **ExportProgressScreen**: Progress modal for export operations
+- **SettingsScreen**: Application settings editor
+- **FileBrowser**: Generic file/folder selection dialog
 
 ## Troubleshooting
 
@@ -257,11 +285,11 @@ MIT License - feel free to use and modify as needed.
 ## Future Enhancements
 
 - Clone VMs
-- VM import from OVA
-- Network configuration
-- Storage management
+- Additional network configuration options
+- Advanced storage management
 - Log viewer
 - Performance metrics
+- VM grouping and organization
 
 ## Contributing
 

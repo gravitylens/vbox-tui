@@ -58,6 +58,7 @@ class ExportScreen(Screen):
     
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "export", "Export"),
     ]
     
     def __init__(self, vm: VM, vbox: VBoxManager):
@@ -104,6 +105,18 @@ class ExportScreen(Screen):
     async def on_mount(self) -> None:
         """Focus the path input on mount."""
         self.query_one("#path-input", Input).focus()
+    
+    def action_export(self) -> None:
+        """Action to trigger export."""
+        self.query_one("#export-btn", Button).press()
+    
+    def action_cancel(self) -> None:
+        """Action to cancel."""
+        self.dismiss(None)
+    
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle Enter key in input field."""
+        await self._handle_export()
     
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses."""

@@ -575,7 +575,7 @@ class VBoxManager:
         ])
     
     def export_vm(self, vm: VM, output_path: str, manifest: bool = True, 
-                  ovf_version: str = "2.0") -> None:
+                  ovf_version: str = "2.0", cancel_event=None) -> None:
         """Export a VM to OVA format.
         
         Args:
@@ -583,17 +583,50 @@ class VBoxManager:
             output_path: Path where the OVA file will be saved (should end in .ova)
             manifest: Whether to include a manifest file (default True)
             ovf_version: OVF version to use, either "0.9", "1.0", or "2.0" (default "2.0")
+            cancel_event: Optional threading.Event to signal cancellation
         """
-        cmd = ["export", vm.uuid, "--output", output_path]
+        cmd = ["VBoxManage", "export", vm.uuid, "--output", output_path]
         
-        # Add OVF version option
+        # Add OVF version option (VBoxManage uses --ovf09, --ovf10, --ovf20, not --ovf)
         if ovf_version:
-            cmd.extend(["--ovf", ovf_version])
+            # Map version to VBoxManage option format
+            version_map = {
+                "0.9": "--ovf09",
+                "1.0": "--ovf10", 
+                "2.0": "--ovf20"
+            }
+            ovf_option = version_map.get(ovf_version, "--ovf20")
+            cmd.append(ovf_option)
         
         # Add manifest option
         if manifest:
             cmd.append("--manifest")
         
-        # Use longer timeout for export operations as they can take a while
-        self._run_command(cmd, timeout=300)
+        # Use Popen so we can terminate if cancelled
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Poll the process and check for cancellation
+        import time
+        while process.poll() is None:
+            if cancel_event and cancel_event.is_set():
+                # Terminate the process
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+                raise RuntimeError("Export was cancelled")
+            time.sleep(0.1)
+        
+        # Check return code
+        if process.returncode != 0:
+            _, stderr = process.communicate()
+            raise RuntimeError(f"VBoxManage error: {stderr}")
+
 

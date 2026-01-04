@@ -17,6 +17,7 @@ from .settings_screen import SettingsScreen
 from .snapshot_screen import SnapshotScreen
 from .disk_screen import DiskScreen
 from .export_screen import ExportScreen
+from .export_progress_screen import ExportProgressScreen
 
 # Set up logging
 logging.basicConfig(
@@ -170,6 +171,8 @@ class VBoxTUI(App):
         super().__init__()
         self.vbox = VBoxManager()
         self.vms: list[VM] = []
+        self.export_in_progress = False
+        self.current_export_path = None
     
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -183,13 +186,25 @@ class VBoxTUI(App):
         
         yield Footer()
     
+    def action_quit(self) -> None:
+        """Override quit to warn if export is in progress."""
+        if self.export_in_progress:
+            self.notify(
+                "⚠ Export in progress! Quitting now will corrupt the export file.\n"
+                "Please wait for the export to complete.",
+                severity="warning",
+                timeout=8
+            )
+        else:
+            self.exit()
+    
     async def on_mount(self) -> None:
         """Load VMs when app starts."""
         self.refresh_vms()
         # Set up automatic refresh every 10 seconds
         self.set_interval(10, self.refresh_vms)
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def refresh_vms(self) -> None:
         """Refresh the VM list."""
         try:
@@ -270,7 +285,7 @@ class VBoxTUI(App):
             if self.selected_vm:
                 self.update_info_panel()
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def update_info_panel(self) -> None:
         """Update the info panel with detailed VM info."""
         if not self.selected_vm:
@@ -288,7 +303,7 @@ class VBoxTUI(App):
             info_panel.update_vm(self.selected_vm)
             self.notify(f"Error loading VM details: {e}", severity="warning")
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def action_start_vm(self) -> None:
         """Start the selected VM."""
         if not self.selected_vm:
@@ -312,7 +327,7 @@ class VBoxTUI(App):
         except Exception as e:
             self.notify(f"Error starting VM: {e}", severity="error", timeout=5)
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def action_stop_vm(self) -> None:
         """Stop the selected VM."""
         if not self.selected_vm:
@@ -336,7 +351,7 @@ class VBoxTUI(App):
         """Force poweroff the selected VM."""
         self._force_poweroff_worker()
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def _force_poweroff_worker(self) -> None:
         """Worker for force poweroff with confirmation."""
         if not self.selected_vm:
@@ -371,7 +386,7 @@ class VBoxTUI(App):
         except Exception as e:
             self.notify(f"Error powering off VM: {e}", severity="error", timeout=5)
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def action_pause_vm(self) -> None:
         """Pause or resume the selected VM."""
         if not self.selected_vm:
@@ -395,7 +410,7 @@ class VBoxTUI(App):
         except Exception as e:
             self.notify(f"Error pausing/resuming VM: {e}", severity="error", timeout=5)
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def action_save_state(self) -> None:
         """Save VM state."""
         if not self.selected_vm:
@@ -415,7 +430,7 @@ class VBoxTUI(App):
         except Exception as e:
             self.notify(f"Error saving state: {e}", severity="error", timeout=5)
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def action_show_gui(self) -> None:
         """Show/reconnect to VM GUI window."""
         if not self.selected_vm:
@@ -503,7 +518,7 @@ class VBoxTUI(App):
         """Export the selected VM to OVA format."""
         self._export_vm_worker()
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def _export_vm_worker(self) -> None:
         """Worker to handle VM export with UI."""
         if not self.selected_vm:
@@ -524,10 +539,11 @@ class VBoxTUI(App):
         result = await self.app.push_screen_wait(export_screen)
         
         if result:  # If user confirmed
-            await self._do_export_vm(result)
+            # Show progress screen and start export
+            await self._do_export_with_progress(result)
     
-    async def _do_export_vm(self, config: dict) -> None:
-        """Actually export the VM."""
+    async def _do_export_with_progress(self, config: dict) -> None:
+        """Export VM with progress dialog."""
         if not self.selected_vm:
             return
         
@@ -536,38 +552,110 @@ class VBoxTUI(App):
         ovf_version = config["ovf_version"]
         manifest = config["manifest"]
         
+        # Create and show progress screen
+        progress_screen = ExportProgressScreen(vm_name, output_path)
+        
+        # Create a task for the export so we can cancel it
+        export_task = None
+        export_success = False
+        
+        # Create a threading event for cancellation
+        import threading
+        cancel_event = threading.Event()
+        
+        def cancel_export():
+            """Cancel the export task."""
+            cancel_event.set()
+            if export_task and not export_task.done():
+                export_task.cancel()
+        
+        # Set cancel callback
+        progress_screen.cancel_callback = cancel_export
+        
+        # Mark export as in progress
+        self.export_in_progress = True
+        self.current_export_path = output_path
+        
         try:
-            self.notify(
-                f"Exporting '{vm_name}' to {output_path}...\nThis may take a few minutes.",
-                severity="information",
-                timeout=10
+            logger.info(f"Starting export of VM '{vm_name}' to {output_path} (OVF version: {ovf_version}, manifest: {manifest})")
+            
+            # Start the export task in the background
+            export_task = asyncio.create_task(
+                asyncio.to_thread(
+                    self.vbox.export_vm,
+                    self.selected_vm,
+                    output_path,
+                    manifest=manifest,
+                    ovf_version=ovf_version,
+                    cancel_event=cancel_event
+                )
             )
             
-            await asyncio.to_thread(
-                self.vbox.export_vm,
-                self.selected_vm,
-                output_path,
-                manifest=manifest,
-                ovf_version=ovf_version
+            # Show the progress screen in parallel (don't wait yet)
+            screen_task = asyncio.create_task(self.app.push_screen_wait(progress_screen))
+            
+            # Wait for export to complete
+            await export_task
+            
+            logger.info(f"Export completed successfully for VM '{vm_name}'")
+            export_success = True
+            
+            # Mark progress screen as complete
+            progress_screen.mark_complete(
+                success=True,
+                message=f"VM exported successfully to {output_path}"
             )
             
-            self.notify(
-                f"Successfully exported '{vm_name}' to:\n{output_path}",
-                severity="information",
-                timeout=10
-            )
+            # Wait for the screen to be dismissed
+            await screen_task
+            
+        except asyncio.CancelledError:
+            logger.warning(f"Export was cancelled for VM '{vm_name}'")
+            if not progress_screen.completed:
+                progress_screen.mark_complete(
+                    success=False,
+                    message="Export was cancelled"
+                )
+            # Clean up partial export file
+            import os
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                    logger.info(f"Removed partial export file: {output_path}")
+                except Exception as cleanup_error:
+                    logger.error(f"Failed to clean up partial export: {cleanup_error}")
+            # Wait for the screen to be dismissed
+            try:
+                await screen_task
+            except:
+                pass
+            # Don't re-raise - allow clean exit
         except Exception as e:
-            self.notify(
-                f"Error exporting VM: {str(e)}",
-                severity="error",
-                timeout=10
-            )
+            # Log the full error for debugging
+            logger.error(f"Failed to export VM '{vm_name}': {e}", exc_info=True)
+            
+            # Show error in progress screen
+            if not progress_screen.completed:
+                progress_screen.mark_complete(
+                    success=False,
+                    message=str(e)
+                )
+            
+            # Wait for the screen to be dismissed if it was shown
+            try:
+                await screen_task
+            except:
+                pass
+        finally:
+            # Clear export tracking
+            self.export_in_progress = False
+            self.current_export_path = None
     
     def action_delete_vm(self) -> None:
         """Delete the selected VM."""
         self._delete_vm_worker()
     
-    @work(exclusive=True)
+    @work(exclusive=False)
     async def _delete_vm_worker(self) -> None:
         """Worker to handle VM deletion with confirmation."""
         if not self.selected_vm:
