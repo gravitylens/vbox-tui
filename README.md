@@ -100,6 +100,7 @@ python -m vbox_tui.app
 | `c` | Configure selected VM |
 | `m` | Manage snapshots |
 | `k` | Manage disks |
+| `x` | Export VM to OVA |
 | `d` | Delete selected VM |
 | `q` | Quit application |
 
@@ -136,6 +137,21 @@ Press `k` to manage disks for the selected VM. In the disk screen you can:
   - Disk file is not deleted, only detached
 
 **Note**: VM should be powered off before attaching/detaching disks.
+
+## VM Export
+
+Press `x` to export the selected VM to OVA (Open Virtualization Format Archive) format. In the export screen you can:
+
+- **Output Location**: Specify where to save the .ova file (use Browse to select)
+- **OVF Version**: Choose the OVF format version:
+  - **OVF 0.9**: Legacy format for older virtualization software
+  - **OVF 1.0**: Widely compatible format
+  - **OVF 2.0**: Recommended modern format with best feature support
+- **Manifest**: Automatically includes a manifest file for integrity verification
+
+The exported OVA file can be imported into VirtualBox or other virtualization platforms like VMware, supporting VM portability and backup.
+
+**Note**: VMs must be powered off before exporting. Export operations may take several minutes depending on VM disk size.
 
 ## Settings
 
@@ -241,8 +257,7 @@ MIT License - feel free to use and modify as needed.
 ## Future Enhancements
 
 - Clone VMs
-- Snapshot management
-- VM import/export
+- VM import from OVA
 - Network configuration
 - Storage management
 - Log viewer

@@ -16,6 +16,7 @@ from .create_vm_screen import CreateVMScreen
 from .settings_screen import SettingsScreen
 from .snapshot_screen import SnapshotScreen
 from .disk_screen import DiskScreen
+from .export_screen import ExportScreen
 
 # Set up logging
 logging.basicConfig(
@@ -152,6 +153,7 @@ class VBoxTUI(App):
         "delete_vm": ("d", "Delete"),
         "snapshots": ("m", "Snapshots"),
         "disks": ("k", "Disks"),
+        "export_vm": ("x", "Export"),
     }
     
     # Generate BINDINGS from KEYBINDINGS dict
@@ -496,6 +498,70 @@ class VBoxTUI(App):
         await self.push_screen(disk_screen)
         # Refresh after returning
         self.refresh_vms()
+    
+    def action_export_vm(self) -> None:
+        """Export the selected VM to OVA format."""
+        self._export_vm_worker()
+    
+    @work(exclusive=True)
+    async def _export_vm_worker(self) -> None:
+        """Worker to handle VM export with UI."""
+        if not self.selected_vm:
+            self.notify("No VM selected", severity="warning")
+            return
+        
+        # Check if VM is running
+        if self.selected_vm.is_running or self.selected_vm.state == "paused":
+            self.notify(
+                "Cannot export a running VM. Please stop the VM first.",
+                severity="warning",
+                timeout=5
+            )
+            return
+        
+        # Open export screen
+        export_screen = ExportScreen(self.selected_vm, self.vbox)
+        result = await self.app.push_screen_wait(export_screen)
+        
+        if result:  # If user confirmed
+            await self._do_export_vm(result)
+    
+    async def _do_export_vm(self, config: dict) -> None:
+        """Actually export the VM."""
+        if not self.selected_vm:
+            return
+        
+        vm_name = self.selected_vm.name
+        output_path = config["output_path"]
+        ovf_version = config["ovf_version"]
+        manifest = config["manifest"]
+        
+        try:
+            self.notify(
+                f"Exporting '{vm_name}' to {output_path}...\nThis may take a few minutes.",
+                severity="information",
+                timeout=10
+            )
+            
+            await asyncio.to_thread(
+                self.vbox.export_vm,
+                self.selected_vm,
+                output_path,
+                manifest=manifest,
+                ovf_version=ovf_version
+            )
+            
+            self.notify(
+                f"Successfully exported '{vm_name}' to:\n{output_path}",
+                severity="information",
+                timeout=10
+            )
+        except Exception as e:
+            self.notify(
+                f"Error exporting VM: {str(e)}",
+                severity="error",
+                timeout=10
+            )
     
     def action_delete_vm(self) -> None:
         """Delete the selected VM."""

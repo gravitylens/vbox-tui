@@ -573,4 +573,27 @@ class VBoxManager:
             "--size", str(size_mb),
             "--format", format
         ])
+    
+    def export_vm(self, vm: VM, output_path: str, manifest: bool = True, 
+                  ovf_version: str = "2.0") -> None:
+        """Export a VM to OVA format.
+        
+        Args:
+            vm: The VM to export
+            output_path: Path where the OVA file will be saved (should end in .ova)
+            manifest: Whether to include a manifest file (default True)
+            ovf_version: OVF version to use, either "0.9", "1.0", or "2.0" (default "2.0")
+        """
+        cmd = ["export", vm.uuid, "--output", output_path]
+        
+        # Add OVF version option
+        if ovf_version:
+            cmd.extend(["--ovf", ovf_version])
+        
+        # Add manifest option
+        if manifest:
+            cmd.append("--manifest")
+        
+        # Use longer timeout for export operations as they can take a while
+        self._run_command(cmd, timeout=300)
 
