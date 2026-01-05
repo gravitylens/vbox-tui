@@ -5,6 +5,8 @@ A modern Terminal User Interface (TUI) for managing VirtualBox virtual machines,
 ![VirtualBox TUI](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
+![main screen](images/vbox-tui.png)
+
 ## Features
 
 - **VM Overview**: See all your VMs at a glance with status indicators
@@ -110,6 +112,8 @@ VMs are always started in headless mode. Use `g` to open the GUI console window.
 
 ## Snapshot Management
 
+![image](images/snapshots.png)
+
 Press `m` to manage snapshots for the selected VM. In the snapshot screen you can:
 
 - **Take Snapshot (t)**: Create a new snapshot with name and description
@@ -123,6 +127,8 @@ Snapshots allow you to save the current state of a VM and restore to it later. T
 - Testing configurations safely
 
 ## Disk Management
+
+![image](images/disks.png)
 
 Press `k` to manage disks for the selected VM. In the disk screen you can:
 
@@ -139,6 +145,8 @@ Press `k` to manage disks for the selected VM. In the disk screen you can:
 **Note**: VM should be powered off before attaching/detaching disks.
 
 ## VM Export
+
+![image](images/export.png)
 
 Press `x` to export the selected VM to OVA (Open Virtualization Format Archive) format. The export process:
 

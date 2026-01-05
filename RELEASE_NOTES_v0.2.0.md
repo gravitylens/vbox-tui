@@ -1,6 +1,6 @@
 # VBox TUI v0.2.0 Release Notes
 
-## 🎉 New Features
+## New Features
 
 ### VM Export to OVA Format
 The headline feature of this release is the ability to export VMs to OVA (Open Virtualization Format) files directly from the TUI!
@@ -24,17 +24,17 @@ The headline feature of this release is the ability to export VMs to OVA (Open V
 
 Exported OVA files can be imported into VirtualBox, VMware, and other virtualization platforms.
 
-## 🐛 Bug Fixes
+## Bug Fixes
 - Fixed clean exit after export cancellation
 - Improved subprocess cleanup on application exit
 - Enhanced error handling and reporting during export operations
 
-## 📚 Documentation
+## Documentation
 - Updated README with comprehensive export documentation
 - Added detailed architecture section listing all screen components
 - Clarified keyboard shortcuts and usage patterns
 
-## 🛠️ Technical Improvements
+## Technical Improvements
 - Implemented proper subprocess termination using threading events
 - Added progress modal with full-width styling
 - Enhanced worker task management for long-running operations
